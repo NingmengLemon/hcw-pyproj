@@ -84,8 +84,8 @@ def convert_one(filepath: str, saveas: Optional[str] = None):
             with open(filepath, "r", encoding="utf-8") as fp:
                 nb = nbformat.read(fp, as_version=4)
             md, _ = exporter.from_notebook_node(nb)
-            tofile = file_noext + ".md" if saveas is None else saveas
-            with open(tofile, "w+", encoding="utf-8") as fp:
+            tofile_noext = file_noext if saveas is None else os.path.splitext(saveas)[0]
+            with open(tofile_noext + ".md", "w+", encoding="utf-8") as fp:
                 fp.write(postprocess_wrapped(md))
             print("converted:", filepath)
         case ".md":
@@ -113,7 +113,7 @@ def main():
         if root.endswith(slash + "samples"):
             print("skipped:", root)
             continue
-        
+
         for filename in filenames:
             os.makedirs(toroot, exist_ok=True)
 
