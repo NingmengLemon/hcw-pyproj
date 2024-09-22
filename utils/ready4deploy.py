@@ -46,6 +46,7 @@ def format_md(md):
         options={
             "end-of-line": "keep",
         },
+        extensions={"footnote"}
     )
 
 
@@ -105,6 +106,7 @@ def main():
         shutil.rmtree(tofolder)
         print("deleted:", tofolder)
     for root, _, filenames in os.walk(fromfolder):
+        print("---")
         toroot = root.replace(fromfolder, tofolder)
         if root.endswith(slash + "static"):
             shutil.copytree(root, toroot, dirs_exist_ok=True)

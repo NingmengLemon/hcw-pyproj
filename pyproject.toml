@@ -18,6 +18,7 @@ dependencies = [
     "nbconvert>=7.16.4",
     "nbformat>=5.10.4",
     "mdformat>=0.7.17",
+    "mdformat-footnote>=0.1.1",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
