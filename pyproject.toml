@@ -17,6 +17,7 @@ dependencies = [
     "ipykernel>=6.29.5",
     "nbconvert>=7.16.4",
     "nbformat>=5.10.4",
+    "mdformat>=0.7.17",
 ]
 requires-python = ">=3.11"
 readme = "README.md"

@@ -1,8 +1,10 @@
 import os
+import re
 
+import mdformat
 import nbformat
-from traitlets.config import Config
 from nbconvert import MarkdownExporter
+from nbconvert.preprocessors import Preprocessor
 
 
 def return_available(filename, *possi_paths: str):
@@ -11,10 +13,46 @@ def return_available(filename, *possi_paths: str):
             return file
 
 
-config = Config()
-# if f := return_available("detailswrapped.md.j2", "./", "./utils/"):
-#     config.MarkdownExporter.template_file = f
-exporter = MarkdownExporter(config=config)
+PLACE_HOLDER_BEGIN = "{{place_holder_toolong_output_begin}}"
+PLACE_HOLDER_END = "{{place_holder_toolong_output_end}}"
+REGEX_PAIR = re.compile(
+    re.escape(PLACE_HOLDER_BEGIN) + "(.*?)" + re.escape(PLACE_HOLDER_END), re.DOTALL
+)
+REGEX_INDENT_FORW = re.compile(r"^\s{4}", re.MULTILINE)
+
+
+class CellOutputWrappingPreprocessor(Preprocessor):
+    def preprocess_cell(self, cell: dict, resources: dict, index: int):
+        if cell["cell_type"] == "code":
+            if "outputs" in cell:
+                for output in cell["outputs"]:
+                    if (text := output.get("text", "")):
+                        output["text"] = (
+                            f"{PLACE_HOLDER_BEGIN}\n" + text + f"\n{PLACE_HOLDER_END}"
+                        )
+        return cell, resources
+
+
+def indent_forward(text):
+    return REGEX_INDENT_FORW.sub("", text)
+
+
+def postprocess_wrapped(mdtext: str):
+    return mdformat.text(
+        REGEX_PAIR.sub(
+            lambda x: "\n<details><summary>Output</summary>\n\n```txt\n"
+            + indent_forward(x.group(1)).strip()
+            + "\n```\n\n</details>",
+            mdtext,
+        ),
+        options={
+            "end-of-line": "keep",
+        }
+    )
+
+
+exporter = MarkdownExporter()
+exporter.register_preprocessor(CellOutputWrappingPreprocessor(), True)
 
 
 def convert_one(filepath: str):
@@ -23,52 +61,10 @@ def convert_one(filepath: str):
         with open(filepath, "r", encoding="utf-8") as fp:
             nb = nbformat.read(fp, as_version=4)
         md, _ = exporter.from_notebook_node(nb)
+        # print(_)
         with open(file_noext + ".md", "w+", encoding="utf-8") as fp:
-            # fp.write(handle_md(md))
-            fp.write(md)
+            fp.write(postprocess_wrapped(md))
         print("converted:", filepath)
-
-
-# 吗的我要骂人了
-def handle_md(md: str):
-    result: list[str] = []
-    alert = enter = False
-    wrapped: list[str] = []
-    codeblock_quote_count = 0
-    for line in md.splitlines():
-        if line == "":
-            alert = True
-            result.append(line)
-            continue
-        if line.startswith("```"):
-            codeblock_quote_count += 1
-        if (
-            (alert or enter)
-            and line.startswith(" " * 4)
-            and codeblock_quote_count % 2 == 0
-        ):
-            enter = True
-            wrapped.append(line.removeprefix(" " * 4))
-            continue
-        else:
-            alert = enter = False
-        if wrapped:
-            if len(wrapped) > 20:
-                wrapped = (
-                    [
-                        f"<details><summary>Output {len(wrapped)} lines</summary>\n",
-                        "```txt",
-                    ]
-                    + ["\n".join(wrapped).strip()]
-                    + [
-                        "```",
-                        "\n</details>",
-                    ]
-                )
-            result.extend(wrapped)
-            wrapped.clear()
-        result.append(line)
-    return "\n".join(result)
 
 
 def main():
