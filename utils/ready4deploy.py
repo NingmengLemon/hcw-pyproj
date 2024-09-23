@@ -3,6 +3,7 @@ import re
 import shutil
 from typing import Optional
 
+import requests
 import mdformat
 import nbformat
 from nbconvert import MarkdownExporter
@@ -22,6 +23,10 @@ REGEX_PAIR = re.compile(
 )
 REGEX_INDENT_FORW = re.compile(r"^\s{4}", re.MULTILINE)
 REGEX_LINK_IPYNB = re.compile(r"\[(.*?)\]\((.*?\.ipynb)(#[^)]*)?\)")
+REGEX_LINK_STATIC = re.compile(r"!\[(.*?)\]\(((?:\./)?static/(.*?))\)")
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+}
 
 
 class CellOutputWrappingPreprocessor(Preprocessor):
@@ -46,7 +51,7 @@ def format_md(md):
         options={
             "end-of-line": "keep",
         },
-        extensions={"footnote"}
+        extensions={"footnote"},
     )
 
 
@@ -77,6 +82,28 @@ def update_ipynb_ref(md):
     return REGEX_LINK_IPYNB.sub(replace_link, md)
 
 
+def update_cdn_ref(md: str, cdn="https://cdn.xyxsw.site/"):
+    def replace_link(match: re.Match):
+        text = match.group(1)
+        localref = match.group(2)
+        filename = match.group(3)
+        if (
+            code := requests.get(
+                (url := os.path.join(cdn, filename)),
+                timeout=10,
+                stream=True,
+                headers=HEADERS,
+            ).status_code
+        ) == 200:
+            print("cdn ok:", url)
+            return f"![{text}]({url})"
+        else:
+            print("cdn bad:", url, f"{code=}")
+            return f"![{text}]({localref})"
+
+    return REGEX_LINK_STATIC.sub(replace_link, md)
+
+
 def convert_one(filepath: str, saveas: Optional[str] = None):
     file_noext, ext = os.path.splitext(filepath)
     ext = ext.lower()
@@ -94,7 +121,7 @@ def convert_one(filepath: str, saveas: Optional[str] = None):
                 md = fp.read()
             tofile = file_noext + ".conv.md" if saveas is None else saveas
             with open(tofile, "w+", encoding="utf-8") as fp:
-                fp.write(format_md(update_ipynb_ref(md)))
+                fp.write(format_md(update_cdn_ref(update_ipynb_ref(md))))
             print("converted:", filepath)
 
 
