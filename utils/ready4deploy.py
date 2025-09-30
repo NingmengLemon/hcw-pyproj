@@ -82,24 +82,12 @@ def update_ipynb_ref(md):
     return REGEX_LINK_IPYNB.sub(replace_link, md)
 
 
-def update_cdn_ref(md: str, cdn="https://cdn.xyxsw.site/"):
+def update_ref(md: str):
     def replace_link(match: re.Match):
         text = match.group(1)
         localref = match.group(2)
         filename = match.group(3)
-        if (
-            code := requests.get(
-                (url := os.path.join(cdn, filename)),
-                timeout=10,
-                stream=True,
-                headers=HEADERS,
-            ).status_code
-        ) == 200:
-            print("cdn ok:", url)
-            return f"![{text}]({url})"
-        else:
-            print("cdn bad:", url, f"{code=}")
-            return f"![{text}]({localref})"
+        return f"![{text}]({localref})"
 
     return REGEX_LINK_STATIC.sub(replace_link, md)
 
@@ -121,7 +109,7 @@ def convert_one(filepath: str, saveas: Optional[str] = None):
                 md = fp.read()
             tofile = file_noext + ".conv.md" if saveas is None else saveas
             with open(tofile, "w+", encoding="utf-8") as fp:
-                fp.write(format_md(update_cdn_ref(update_ipynb_ref(md))))
+                fp.write(format_md(update_ref(update_ipynb_ref(md))))
             print("converted:", filepath)
 
 
